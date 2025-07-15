@@ -125,10 +125,13 @@ const conditionMultipliers = {
 
       // CA * popden * inj cost
       const FC_inj = 5 * 0.0013 * 100000;
+      let FC_leak = "N/A";
       if (steamData && !isNaN(trapCount)) {
         const leakRate = steamData.leakRateKgHr * trapCount;
         const Fc_Steam = steamData.costPerTon / 1000 / 35;
         FC_loss = leakRate * Fc_Steam * 8760;
+        FC_leak = FC_loss + FC_inj;
+        var FC_cold = FC_leak;
       }
 
       let neta_adj_emu = "N/A";
@@ -177,7 +180,12 @@ const conditionMultipliers = {
         `Adjusted η for Equipment (η_adj_emu): ${typeof neta_adj_emu === 'number' ? neta_adj_emu.toFixed(4) : neta_adj_emu}` +
         `
 Estimated Steam Loss Cost (FC_loss): ${typeof FC_loss === 'number' ? FC_loss.toFixed(2) + ' USD/year' : FC_loss}
-Injection Cost (FC_inj): ${FC_inj.toFixed(2)} USD/year`;
+Injection Cost (FC_inj): ${FC_inj.toFixed(2)} USD/year
+Leakage Cost (FC_leak): ${typeof FC_leak === 'number' ? FC_leak.toFixed(2) + ' USD/year' : FC_leak}
+Blockage Cost (FC_cold): ${typeof FC_cold === 'number' ? FC_cold.toFixed(2) + ' USD/year' : FC_cold}
+Risk from Leakage (Risk_leak): ${typeof P_final_leak_system === 'number' && typeof FC_leak === 'number' ? (P_final_leak_system * FC_leak * 35).toFixed(2) + ' THB/year' : 'N/A'}
+Risk from Blockage (Risk_cold): ${typeof P_final_blockage_system === 'number' && typeof FC_cold === 'number' ? (P_final_blockage_system * FC_cold * 35).toFixed(2) + ' THB/year' : 'N/A'}
+Total Risk (Risk): ${typeof P_final_blockage_system === 'number' && typeof FC_cold === 'number' && typeof P_final_leak_system === 'number' && typeof FC_leak === 'number' ? ((P_final_blockage_system * FC_cold * 35) + (P_final_leak_system * FC_leak * 35)).toFixed(2) + ' THB/year' : 'N/A'}`;
 
       document.getElementById("resultDisplay").innerText = resultText;
     }
