@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Steam Trap Inspection Interface</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    h2 {
+      color: #333;
+    }
+    .form-section {
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    input, select, button {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+    .grid-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+    }
+    .result-box {
+      background: #e8f5e9;
+      padding: 15px;
+      border-radius: 6px;
+      font-weight: bold;
+      margin-top: 10px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h2>Steam Trap Inspection Input Interface</h2>
+
+  <script>
+    const trapDefaults = {
+      "Free float": { default: 1.8, leakage: 16.1, blockage: 13.8 },
+      "Inverted bucket": { default: 1.6, leakage: 16.1, blockage: 13.8 },
+      "Lever float": { default: 1.7, leakage: 11.7, blockage: 8.5 },
+      "Bimetal": { default: 1.8, leakage: 8.0, blockage: 7.5 },
+      "Balanced pressure": { default: 2.0, leakage: 5.3, blockage: 5.2 },
+      "Disc": { default: 2.0, leakage: 9.4, blockage: 5.0 },
+      "Impulse": { default: 2.0, leakage: 9.4, blockage: 5.0 },
+      "Control valve": { default: 1.8, leakage: 61.5, blockage: 61.5 },
+      "Mechanical pump": { default: 1.2, leakage: 3.1, blockage: 3.1 }
+    };
+
+    const equipmentDefaults = {
+      "Steam Turbine": { neta: 34.48, beta: 3 },
+      "Heat Exchanger": { neta: 22.73, beta: 3 },
+      "Tracing-instrumentation": { neta: 52.63, beta: 3 },
+      "Tracing-revief valve": { neta: 55.56, beta: 3 },
+      "Steam header": { neta: 25.1, beta: 3 },
+      "Condensate recovery piping": { neta: 21.5, beta: 3 },
+      "Distillation column": { neta: 37, beta: 3 },
+      "Flare": { neta: 13.3, beta: 3 }
+    };
+
+    const steamLossData = {
+  "3.4 Bar": { costPerTon: 911.53, leakRateKgHr: 3.76 },
+  "10 Bar": { costPerTon: 986.38, leakRateKgHr: 11.06 },
+  "20 Bar": { costPerTon: 986.29, leakRateKgHr: 22.13 },
+  "40 Bar": { costPerTon: 1021.00, leakRateKgHr: 44.27 }
+};
+
+const conditionMultipliers = {
+      design_7_5: { Poor: 0.5, Average: 0.85, Good: 1, "Very Good": 1.15 },
+      operation_7_6: { Poor: 0.77, Average: 0.85, Good: 1 },
+      maintenance_7_7: { Poor: 0.65, Average: 0.72, Good: 1, "Very Good": 1.1 },
+      design_7_15: { Poor: 0.5, Average: 0.7, Good: 1, "Very Good": 1.1 },
+      operation_7_16: { Poor: 0.45, Average: 0.7, Good: 0.85, "Very Good": 1 },
+      maintenance_7_17: { Poor: 0.4, Average: 0.6, Good: 1 }
+    };
+
+    function calculateAll() {
+      const type = document.getElementById("trapType").value;
+      const design = document.getElementById("designConditionTrap").value;
+      const operation = document.getElementById("operateConditionTrap").value;
+      const maintenance = document.getElementById("maintConditionTrap").value;
+      const timeYears = parseFloat(document.getElementById("timeYears").value);
+      const trapCount = parseFloat(document.getElementById("trapCount").value);
+
+      const equipment = document.getElementById("equipment").value;
+      const designEquip = document.getElementById("designConditionEquip").value;
+      const operationEquip = document.getElementById("operateConditionEquip").value;
+      const maintenanceEquip = document.getElementById("maintConditionEquip").value;
+
+      const leakage = trapDefaults[type].leakage;
+      const blockage = trapDefaults[type].blockage;
+      const defaultValue = trapDefaults[type].default;
+
+      const multiplierDesign = conditionMultipliers.design_7_5[design] || 1;
+      const multiplierOperation = conditionMultipliers.operation_7_6[operation] || 1;
+      const multiplierMaintenance = conditionMultipliers.maintenance_7_7[maintenance] || 1;
+
+      const neta_adj_leak_st = leakage * multiplierDesign * multiplierOperation * multiplierMaintenance;
+      const neta_adj_cold_st = blockage * multiplierDesign * multiplierOperation * multiplierMaintenance;
+
+      const P_final_leak_st = 1 - Math.exp(-Math.pow(timeYears / neta_adj_leak_st, defaultValue));
+      const P_final_blockage_st = 1 - Math.exp(-Math.pow(timeYears / neta_adj_cold_st, defaultValue));
+      const P_final_parallel_leak_st = Math.pow(P_final_leak_st, trapCount);
+      const P_final_parallel_blockage_st = Math.pow(P_final_blockage_st, trapCount);
+
+      let FC_loss = "N/A";
+      const selectedPressure = document.getElementById("pressure").value;
+      const steamData = steamLossData[selectedPressure];
+
+      // CA * popden * inj cost
+      const FC_inj = 5 * 0.0013 * 100000;
+      let FC_leak = "N/A";
+      if (steamData && !isNaN(trapCount)) {
+        const leakRate = steamData.leakRateKgHr * trapCount;
+        const Fc_Steam = steamData.costPerTon / 1000 / 35;
+        FC_loss = leakRate * Fc_Steam * 8760;
+        FC_leak = FC_loss + FC_inj;
+        var FC_cold = FC_leak;
+      }
+
+      let neta_adj_emu = "N/A";
+      let beta_emu = null;
+      let P_final_equ = "N/A";
+      let P_final_leak_system = "N/A";
+      let P_final_blockage_system = "N/A";
+      if (equipmentDefaults[equipment]) {
+        const defaultNeta = equipmentDefaults[equipment].neta;
+        const md = conditionMultipliers.design_7_15[designEquip] || 1;
+        const mo = conditionMultipliers.operation_7_16[operationEquip] || 1;
+        const mm = conditionMultipliers.maintenance_7_17[maintenanceEquip] || 1;
+        neta_adj_emu = defaultNeta * md * mo * mm;
+        beta_emu = equipmentDefaults[equipment].beta;
+      }
+
+      if (typeof neta_adj_emu === 'number' && typeof beta_emu === 'number') {
+        P_final_equ = 1 - Math.exp(-Math.pow(timeYears / neta_adj_emu, beta_emu));
+      }
+      if (typeof P_final_equ === 'number' && typeof P_final_parallel_leak_st === 'number') {
+        P_final_leak_system = P_final_equ * P_final_parallel_leak_st;
+      }
+      if (typeof P_final_equ === 'number' && typeof P_final_parallel_blockage_st === 'number') {
+        P_final_blockage_system = P_final_equ * P_final_parallel_blockage_st;
+      }
+
+      const resultText =
+        `Adjusted Leakage (η_adj_leak_st): ${neta_adj_leak_st.toFixed(4)}
+` +
+        `Adjusted Blockage (η_adj_cold_st): ${neta_adj_cold_st.toFixed(4)}
+` +
+        `P(t)f,final,leak,ST: ${P_final_leak_st.toFixed(6)}
+` +
+        `P(t)f,final,blockage,ST: ${P_final_blockage_st.toFixed(6)}
+` +
+        `P(t)f,final,parallel,leak,ST: ${P_final_parallel_leak_st.toFixed(6)}
+` +
+        `P(t)f,final,parallel,blockage,ST: ${P_final_parallel_blockage_st.toFixed(6)}
+` +
+        `P(t)f,final,blockage(steam system): ${typeof P_final_blockage_system === 'number' ? P_final_blockage_system.toFixed(6) : P_final_blockage_system}
+` +
+        `P(t)f,final,leak(steam system): ${typeof P_final_leak_system === 'number' ? P_final_leak_system.toFixed(6) : P_final_leak_system}
+` +
+        `P(t)f,final,equ: ${typeof P_final_equ === 'number' ? P_final_equ.toFixed(6) : P_final_equ}
+` +
+        `Adjusted η for Equipment (η_adj_emu): ${typeof neta_adj_emu === 'number' ? neta_adj_emu.toFixed(4) : neta_adj_emu}` +
+        `
+Estimated Steam Loss Cost (FC_loss): ${typeof FC_loss === 'number' ? FC_loss.toFixed(2) + ' USD/year' : FC_loss}
+Injection Cost (FC_inj): ${FC_inj.toFixed(2)} USD/year
+Leakage Cost (FC_leak): ${typeof FC_leak === 'number' ? FC_leak.toFixed(2) + ' USD/year' : FC_leak}
+Blockage Cost (FC_cold): ${typeof FC_cold === 'number' ? FC_cold.toFixed(2) + ' USD/year' : FC_cold}
+Risk from Leakage (Risk_leak): ${typeof P_final_leak_system === 'number' && typeof FC_leak === 'number' ? (P_final_leak_system * FC_leak * 35).toFixed(2) + ' THB/year' : 'N/A'}
+Risk from Blockage (Risk_cold): ${typeof P_final_blockage_system === 'number' && typeof FC_cold === 'number' ? (P_final_blockage_system * FC_cold * 35).toFixed(2) + ' THB/year' : 'N/A'}
+Total Risk (Risk): ${typeof P_final_blockage_system === 'number' && typeof FC_cold === 'number' && typeof P_final_leak_system === 'number' && typeof FC_leak === 'number' ? ((P_final_blockage_system * FC_cold * 35) + (P_final_leak_system * FC_leak * 35)).toFixed(2) + ' THB/year' : 'N/A'}`;
+
+      document.getElementById("resultDisplay").innerText = resultText;
+    }
+  </script>
+
+  <div class="form-section">
+    <h3>Steam Trap Information</h3>
+    <div class="grid-container">
+      <div>
+        <label>Steam Trap Type</label>
+        <select id="trapType">
+          <option>Free float</option>
+          <option>Inverted bucket</option>
+          <option>Lever float</option>
+          <option>Bimetal</option>
+          <option>Balanced pressure</option>
+          <option>Disc</option>
+          <option>Impulse</option>
+          <option>Control valve</option>
+          <option>Mechanical pump</option>
+        </select>
+      </div>
+      <div>
+        <label>Number of Steam Trap</label>
+        <input type="number" id="trapCount">
+      </div>
+      <div>
+        <label>Pressure</label>
+        <select id="pressure">
+          <option>3.4 Bar</option>
+          <option>10 Bar</option>
+          <option>20 Bar</option>
+          <option>40 Bar</option>
+        </select>
+      </div>
+      <div>
+        <label>Design Condition for Steam Trap</label>
+        <select id="designConditionTrap">
+          <option>Poor</option>
+          <option>Average</option>
+          <option>Good</option>
+          <option>Very Good</option>
+        </select>
+      </div>
+      <div>
+        <label>Operate Condition for Steam Trap</label>
+        <select id="operateConditionTrap">
+          <option>Poor</option>
+          <option>Average</option>
+          <option>Good</option>
+        </select>
+      </div>
+      <div>
+        <label>Maintenance Condition for Steam Trap</label>
+        <select id="maintConditionTrap">
+          <option>Poor</option>
+          <option>Average</option>
+          <option>Good</option>
+          <option>Very Good</option>
+        </select>
+      </div>
+      <div>
+        <label>Inspection Results</label>
+        <select id="inspectionResult">
+          <option>Leak detected</option>
+          <option>Blocked</option>
+          <option>OK</option>
+        </select>
+      </div>
+      <div>
+        <label>Time (Years)</label>
+        <input type="number" id="timeYears">
+      </div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <h3>Equipment Information</h3>
+    <div class="grid-container">
+      <div>
+        <label>Equipment</label>
+        <select id="equipment">
+          <option>Steam Turbine</option>
+          <option>Heat Exchanger</option>
+          <option>Tracing-instrumentation</option>
+          <option>Tracing-revief valve</option>
+          <option>Steam header</option>
+          <option>Condensate recovery piping</option>
+          <option>Distillation column</option>
+          <option>Flare</option>
+        </select>
+      </div>
+      <div>
+        <label>Design Condition for Equipment</label>
+        <select id="designConditionEquip">
+          <option>Poor</option>
+          <option>Average</option>
+          <option>Good</option>
+          <option>Very Good</option>
+        </select>
+      </div>
+      <div>
+        <label>Operate Condition for Equipment</label>
+        <select id="operateConditionEquip">
+          <option>Poor</option>
+          <option>Average</option>
+          <option>Good</option>
+          <option>Very Good</option>
+        </select>
+      </div>
+      <div>
+        <label>Maintenance Condition for Equipment</label>
+        <select id="maintConditionEquip">
+          <option>Poor</option>
+          <option>Average</option>
+          <option>Good</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <h3>Inspection Confirmation</h3>
+    <div class="grid-container">
+      <div>
+        <label>If the inspection confirms the expected failure?</label>
+        <select id="inspectionConfirm">
+          <option>Confirm</option>
+          <option>Not Confirm</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <button onclick="calculateAll()">Calculate All Results</button>
+    <div id="resultDisplay" class="result-box">Result will appear here.</div>
+  </div>
+</body>
+</html>
