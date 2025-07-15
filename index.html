@@ -48,7 +48,7 @@
   </style>
 </head>
 <body>
-  <h2>Steam Trap Inspection Input Interface</h2>
+  <h2>Steam Trap Risk-Based-Inspections</h2>
 
   <script>
     const trapDefaults = {
@@ -328,13 +328,16 @@ Total Risk (Risk): ${typeof P_final_blockage_system === 'number' && typeof FC_co
   <div class="form-section">
     <h3>Plot Risk Over Time</h3>
     <label for="graphYears">How many years to simulate?</label>
-    <input type="number" id="graphYears" value="10" min="1">
-
-    <label><input type="checkbox" id="checkLeak" checked> Show Risk_leak</label>
-    <label><input type="checkbox" id="checkCold" checked> Show Risk_cold</label>
-    <label><input type="checkbox" id="checkTotal" checked> Show Total Risk</label>
-
+    <input type="number" id="graphYears" value="5" min="1">
+    
     <button onclick="drawGraphWithCalculation()">Plot Graph</button>
+    <details open>
+      <summary>Graph Controls (click to collapse)</summary>
+      
+      <label><input type="checkbox" id="checkLeak" checked> Show Risk_leak</label>
+      <label><input type="checkbox" id="checkCold" checked> Show Risk_cold</label>
+      <label><input type="checkbox" id="checkTotal" checked> Show Total Risk</label>
+    </details>
     <canvas id="riskChart" width="600" height="300"></canvas>
   </div>
 
