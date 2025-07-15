@@ -324,5 +324,117 @@ Total Risk (Risk): ${typeof P_final_blockage_system === 'number' && typeof FC_co
     <button onclick="calculateAll()">Calculate All Results</button>
     <div id="resultDisplay" class="result-box">Result will appear here.</div>
   </div>
+  <!-- Graph Section Added Below -->
+  <div class="form-section">
+    <h3>Plot Risk Over Time</h3>
+    <label for="graphYears">How many years to simulate?</label>
+    <input type="number" id="graphYears" value="10" min="1">
+
+    <label><input type="checkbox" id="checkLeak" checked> Show Risk_leak</label>
+    <label><input type="checkbox" id="checkCold" checked> Show Risk_cold</label>
+    <label><input type="checkbox" id="checkTotal" checked> Show Total Risk</label>
+
+    <button onclick="drawGraphWithCalculation()">Plot Graph</button>
+    <canvas id="riskChart" width="600" height="300"></canvas>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    function drawGraphWithCalculation() {
+      const years = parseInt(document.getElementById("graphYears").value);
+      const showLeak = document.getElementById("checkLeak").checked;
+      const showCold = document.getElementById("checkCold").checked;
+      const showTotal = document.getElementById("checkTotal").checked;
+
+      // Fetch current inputs
+      const type = document.getElementById("trapType").value;
+      const design = document.getElementById("designConditionTrap").value;
+      const operation = document.getElementById("operateConditionTrap").value;
+      const maintenance = document.getElementById("maintConditionTrap").value;
+      const trapCount = parseFloat(document.getElementById("trapCount").value);
+      const pressure = document.getElementById("pressure").value;
+
+      const equipment = document.getElementById("equipment").value;
+      const designEquip = document.getElementById("designConditionEquip").value;
+      const operationEquip = document.getElementById("operateConditionEquip").value;
+      const maintenanceEquip = document.getElementById("maintConditionEquip").value;
+
+      // Pre-calculate constants
+      const leakage = trapDefaults[type].leakage;
+      const blockage = trapDefaults[type].blockage;
+      const defaultBetaTrap = trapDefaults[type].default;
+      const steamData = steamLossData[pressure];
+      const FC_inj = 5 * 0.0013 * 100000;
+      const FC_Steam = steamData.costPerTon / 1000 / 35;
+
+      const defaultNetaEquip = equipmentDefaults[equipment].neta;
+      const betaEquip = equipmentDefaults[equipment].beta;
+
+      // Data arrays
+      const labels = [];
+      const riskLeak = [];
+      const riskCold = [];
+      const riskTotal = [];
+
+      for (let i = 1; i <= years; i=i+0.1) {
+        labels.push(i);
+        // Compute η_adj values
+        const mDes = conditionMultipliers.design_7_5[design] || 1;
+        const mOp = conditionMultipliers.operation_7_6[operation] || 1;
+        const mMain = conditionMultipliers.maintenance_7_7[maintenance] || 1;
+        const neta_leak = leakage * mDes * mOp * mMain;
+        const neta_cold = blockage * mDes * mOp * mMain;
+
+        const mDesE = conditionMultipliers.design_7_15[designEquip] || 1;
+        const mOpE = conditionMultipliers.operation_7_16[operationEquip] || 1;
+        const mMainE = conditionMultipliers.maintenance_7_17[maintenanceEquip] || 1;
+        const neta_emu = defaultNetaEquip * mDesE * mOpE * mMainE;
+
+        // Probability calculations
+        const P_leak_st = 1 - Math.exp(-Math.pow(i / neta_leak, defaultBetaTrap));
+        const P_cold_st = 1 - Math.exp(-Math.pow(i / neta_cold, defaultBetaTrap));
+        const P_equ = 1 - Math.exp(-Math.pow(i / neta_emu, betaEquip));
+
+        const P_par_leak = Math.pow(P_leak_st, trapCount);
+        const P_par_cold = Math.pow(P_cold_st, trapCount);
+
+        const P_final_leak = P_equ * P_par_leak;
+        const P_final_cold = P_equ * P_par_cold;
+
+        // Cost calculations
+        const leakRate = steamData.leakRateKgHr * trapCount;
+        const FC_loss = leakRate * FC_Steam * 8760;
+        const FC_leak = FC_loss + FC_inj;
+        const FC_cold = FC_leak;
+
+        const R_leak = FC_leak * P_final_leak * 35;
+        const R_cold = FC_cold * P_final_cold * 35;
+
+        riskLeak.push(R_leak);
+        riskCold.push(R_cold);
+        riskTotal.push(R_leak + R_cold);
+      }
+
+      const ctx = document.getElementById("riskChart").getContext("2d");
+      if (window.riskChartInstance) window.riskChartInstance.destroy();
+      window.riskChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels.map(v=>parseFloat(v.toFixed(1))),
+          datasets: [
+            showLeak ? { label: 'Risk_leak', data: riskLeak, borderColor: 'red', fill: false } : null,
+            showCold ? { label: 'Risk_cold', data: riskCold, borderColor: 'blue', fill: false } : null,
+            showTotal ? { label: 'Total Risk', data: riskTotal, borderColor: 'green', fill: false } : null
+          ].filter(Boolean)
+        },
+        options: {
+          responsive: true,
+          plugins: { title: { display: true, text: 'Risk vs. Years' } },
+          scales: { x: { title: { display: true, text: 'Year' }, ticks: { stepSize: 0.5 } }, y: { title: { display: true, text: 'Risk (THB/year)' } } }
+        }
+      });
+    }
+  </script>
 </body>
+</html>
 </html>
