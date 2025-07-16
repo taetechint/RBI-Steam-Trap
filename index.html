@@ -180,7 +180,7 @@ const conditionMultipliers = {
         `Adjusted η for Equipment (η_adj_emu): ${typeof neta_adj_emu === 'number' ? neta_adj_emu.toFixed(4) : neta_adj_emu}` +
         `
 Estimated Steam Loss Cost (FC_loss): ${typeof FC_loss === 'number' ? FC_loss.toFixed(2) + ' USD/year' : FC_loss}
-Injection Cost (FC_inj): ${FC_inj.toFixed(2)} USD/year
+Injury Cost (FC_inj): ${FC_inj.toFixed(2)} USD/year
 Leakage Cost (FC_leak): ${typeof FC_leak === 'number' ? FC_leak.toFixed(2) + ' USD/year' : FC_leak}
 Blockage Cost (FC_cold): ${typeof FC_cold === 'number' ? FC_cold.toFixed(2) + ' USD/year' : FC_cold}
 Risk from Leakage (Risk_leak): ${typeof P_final_leak_system === 'number' && typeof FC_leak === 'number' ? (P_final_leak_system * FC_leak * 35).toFixed(2) + ' THB/year' : 'N/A'}
